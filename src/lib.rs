@@ -1,6 +1,7 @@
 use colored::Colorize;
 use std::error::Error;
 use std::fs;
+
 pub struct Config {
     file_path: String,
     query: String,
@@ -23,25 +24,36 @@ impl Config {
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     let contents = fs::read_to_string(config.file_path)?;
-
     let matches = search(&config.query, &contents);
+
+    if matches.len() == 0 {
+        println!("No matches found");
+        return Ok(());
+    }
+
+    println!("\n{}\n", "Matched lines:".bold());
 
     for m in matches.iter() {
         println!("{m}")
     }
 
     if config.flags.contains(&String::from("--verbose")) {
-        println!();
-        println!("{}", "Verbose:".bold());
-        println!();
+        println!("\n{}\n", "Verbose:".bold());
 
-        for line in contents.lines() {
+        for (i, line) in contents.lines().enumerate() {
             if matches.contains(&line) {
-                println!("{}", line.green())
+                println!("{i}. {}", line.green())
             } else {
-                println!("{line}")
+                println!("{i}. {line}")
             }
         }
+    }
+
+    if config.flags.contains(&String::from("--enumerate")) {
+        let count = matches
+            .iter()
+            .fold(0, |acc, line| acc + line.matches(&config.query).count());
+        println!("\n{} {}\n", "Total matches:".bold(), count);
     }
 
     Ok(())
