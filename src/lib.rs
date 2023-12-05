@@ -2,29 +2,17 @@ use colored::Colorize;
 use std::error::Error;
 use std::fs;
 
-pub struct Config {
-    file_path: String,
-    query: String,
-    flags: Vec<String>,
-}
-
-impl Config {
-    pub fn build(args: &[String]) -> Result<Self, &'static str> {
-        if args.len() < 2 {
-            return Err("Expected at least 2 args");
-        }
-
-        Ok(Self {
-            file_path: args[0].clone(),
-            query: args[1].clone(),
-            flags: args[2..].to_vec(),
-        })
-    }
-}
+pub mod config;
+pub use config::Config;
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     let contents = fs::read_to_string(config.file_path)?;
-    let matches = search(&config.query, &contents);
+
+    let matches = if config.ignore_case {
+        search_case_insensitive(&config.query, &contents)
+    } else {
+        search(&config.query, &contents)
+    };
 
     if matches.len() == 0 {
         println!("No matches found");
@@ -41,6 +29,7 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
         println!("\n{}\n", "Verbose:".bold());
 
         for (i, line) in contents.lines().enumerate() {
+            let i = i + 1;
             if matches.contains(&line) {
                 println!("{i}. {}", line.green())
             } else {
@@ -66,18 +55,50 @@ fn search<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
         .collect()
 }
 
+fn search_case_insensitive<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
+    let query = query.to_lowercase();
+
+    contents
+        .lines()
+        .filter(|line| line.to_lowercase().contains(&query))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn one_result() {
+    fn case_sensitive() {
         let query = "duct";
+        let contents = "\
+     Rust:
+safe, fast, productive.
+Pick three.
+Duct tape.";
+
+        assert_eq!(vec!["safe, fast, productive."], search(query, contents));
+    }
+
+    #[test]
+    fn case_insensitive() {
+        let query = "rUsT";
         let contents = "\
 Rust:
 safe, fast, productive.
-Pick three.";
+Pick three.
+Trust me.";
 
-        assert_eq!(vec!["safe, fast, productive."], search(query, contents));
+        assert_eq!(
+            vec!["Rust:", "Trust me."],
+            search_case_insensitive(query, contents)
+        );
+    }
+
+    #[test]
+    fn should_fail_with_no_existing_file() {
+        let config = Config::build(&["nowhere.txt".to_string(), "query".to_string()]).unwrap();
+        let result = run(config);
+        assert!(result.is_err());
     }
 }
