@@ -7,12 +7,12 @@ fn main() {
     let args = &env_args[1..];
 
     let config: Config = Config::build(args).unwrap_or_else(|err| {
-        println!("Error parsing arguments: {err}");
+        eprintln!("Error parsing arguments: {err}");
         process::exit(1);
     });
 
     if let Err(err) = run(config) {
-        println!("Application error: {err}");
+        eprintln!("Application error: {err}");
         process::exit(1);
     };
 }
